@@ -33,6 +33,19 @@ ESTILOS = """
   color:#576d7a; font-size:12px; }
 [data-testid="stMetric"] { background:white; border:1px solid #dfe7eb;
   border-radius:12px; padding:14px 18px; }
+.agp-indicadores { display:grid; grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:14px; margin:18px 0 10px; }
+.agp-tarjeta { border:1px solid; border-top-width:4px; border-radius:12px;
+  padding:16px 18px; min-width:0; }
+.agp-tarjeta--ok { background:#e6f4ea; border-color:#81bc96; color:#14532d; }
+.agp-tarjeta--error { background:#fde8e8; border-color:#e08a8a; color:#8f1d1d; }
+.agp-tarjeta--info { background:#eaf2fb; border-color:#9db9d5; color:#234e70; }
+.agp-tarjeta-label { font-size:14px; line-height:1.4; font-weight:600; }
+.agp-tarjeta-valor { font-size:34px; line-height:1.2; font-weight:700; margin:7px 0; }
+.agp-tarjeta-estado { font-size:12px; line-height:1.4; font-weight:600; }
+@media(max-width:1000px) {
+ .agp-indicadores { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
 @media(max-width:640px) {
  .agp-hero { padding:23px 20px; } .agp-hero h1 { font-size:26px; }
  .block-container { padding-top:4.5rem; }
@@ -97,6 +110,40 @@ def mostrar_maestro() -> None:
     )
 
 
+def mostrar_indicadores(datos: dict) -> None:
+    indicadores = [
+        ("Códigos PMS", "TOTAL_CODIGOS_PMS", "info"),
+        ("Códigos AGP", "TOTAL_CODIGOS_AGP", "info"),
+        ("Coinciden", "TOTAL_OK", "coincidencias"),
+        ("Diferencias de cantidad", "TOTAL_DIFERENCIAS_CANTIDAD", "incidencias"),
+        ("Solo en PMS", "TOTAL_SOLO_PMS", "incidencias"),
+        ("Solo en AGP", "TOTAL_SOLO_AGP", "incidencias"),
+        ("Aportación excluida", "TOTAL_APORTACION_EXCLUIDOS", "info"),
+        ("Errores", "TOTAL_ERRORES_REGISTRADOS", "incidencias"),
+    ]
+    tarjetas = []
+    for etiqueta, clave, grupo in indicadores:
+        cantidad = int(datos[clave])
+        if grupo == "incidencias":
+            color, estado = ("error", "Requiere revisión") if cantidad else ("ok", "Sin incidencias")
+        elif grupo == "coincidencias":
+            color, estado = ("ok", "Coincidencia correcta") if cantidad else ("info", "Sin coincidencias")
+        else:
+            color, estado = "info", "Auditoría de aportación" if clave == "TOTAL_APORTACION_EXCLUIDOS" else "Total de referencia"
+        # Las etiquetas son constantes y los valores se convierten a enteros antes del HTML.
+        tarjetas.append(
+            f'<div class="agp-tarjeta agp-tarjeta--{color}" role="group" aria-label="{etiqueta}">'
+            f'<div class="agp-tarjeta-label">{etiqueta}</div>'
+            f'<div class="agp-tarjeta-valor">{cantidad}</div>'
+            f'<div class="agp-tarjeta-estado">{estado}</div></div>'
+        )
+    st.markdown('<div class="agp-indicadores">' + "".join(tarjetas) + '</div>', unsafe_allow_html=True)
+    st.caption(
+        "Verde: coincidencias o indicador sin incidencias. Rojo: requiere revisión. "
+        "Azul: información de referencia o auditoría. Revise siempre el resultado general."
+    )
+
+
 def mostrar_resultado(resultado: dict) -> None:
     datos = resultado["datos_resumen"]
     st.divider()
@@ -114,16 +161,7 @@ def mostrar_resultado(resultado: dict) -> None:
     )
     st.write(f"**AGP:** {datos['CODIGO_AGP']}")
     st.write(f"**Protocolos:** {datos['PROTOCOLO']}")
-    indicadores = [
-        ("Códigos PMS", "TOTAL_CODIGOS_PMS"), ("Códigos AGP", "TOTAL_CODIGOS_AGP"),
-        ("Coinciden", "TOTAL_OK"), ("Diferencias de cantidad", "TOTAL_DIFERENCIAS_CANTIDAD"),
-        ("Solo en PMS", "TOTAL_SOLO_PMS"), ("Solo en AGP", "TOTAL_SOLO_AGP"),
-        ("Aportación excluida", "TOTAL_APORTACION_EXCLUIDOS"), ("Errores", "TOTAL_ERRORES_REGISTRADOS"),
-    ]
-    for inicio in (0, 4):
-        columnas = st.columns(4)
-        for columna, (etiqueta, clave) in zip(columnas, indicadores[inicio:inicio + 4]):
-            columna.metric(etiqueta, datos[clave])
+    mostrar_indicadores(datos)
     st.download_button(
         "Descargar Excel de validación", resultado["archivo_excel"],
         resultado["nombre_excel"],

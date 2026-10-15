@@ -112,6 +112,26 @@ En **Maestro de aportación** puede consultar y descargar la lista vigente. Solo
 
 ## 8. Interprete las alertas
 
+### Colores de las tarjetas del resumen
+
+Las tarjetas muestran el color y una etiqueta de estado para facilitar la revisión:
+
+| Tarjeta | Color y significado |
+| --- | --- |
+| **Coinciden** | Verde cuando hay códigos con cantidades coincidentes. Si el conteo es cero, aparece azul con la etiqueta `Sin coincidencias`. |
+| **Diferencias de cantidad** | Rojo si el conteo es mayor que cero: hay cantidades por corregir o justificar. Verde si es cero. |
+| **Solo en PMS** | Rojo si el conteo es mayor que cero: hay códigos del PMS valorizable que faltan en AGP. Verde si es cero. |
+| **Solo en AGP** | Rojo si el conteo es mayor que cero: hay códigos valorizados que no aparecen en el PMS valorizable. Verde si es cero. |
+| **Errores** | Rojo si el conteo es mayor que cero: la validación está incompleta y debe revisar la hoja `Errores`. Verde si es cero. |
+| **Códigos PMS / Códigos AGP** | Azul: totales de referencia; el color no indica por sí solo si el caso es correcto. |
+| **Aportación excluida** | Azul: cantidad de códigos excluidos para auditoría. Una exclusión prevista no representa un error. |
+
+**Verde significa coincidencia o ausencia de incidencias en ese indicador; rojo significa que requiere revisión; azul significa información de referencia o auditoría.** Las etiquetas `Coincidencia correcta`, `Sin incidencias` y `Requiere revisión` permiten interpretar el resultado sin depender únicamente del color.
+
+Una tarjeta verde no aprueba el caso completo. Siempre prevalece el mensaje general de validación: si hay errores de lectura, los conteos pueden ser parciales aunque otras tarjetas aparezcan verdes.
+
+### Estados de los registros
+
 | Estado | Qué significa | Acción |
 | --- | --- | --- |
 | `OK` | El código existe en ambos archivos y coincide la cantidad. | Continúe con las demás revisiones técnicas del procedimiento. |
