@@ -4,12 +4,15 @@ Fecha: 15 de octubre de 2026.
 
 ## Alcance comprobado
 
-Se ejecutaron **15 pruebas automatizadas satisfactorias** con Python 3.12.14, Streamlit 1.66.0, pandas 3.0.6, openpyxl 3.1.5 y Pillow 12.3.0.
+Se ejecutaron **19 pruebas automatizadas satisfactorias** con Python 3.12.10, Streamlit 1.66.0, pandas 3.0.6, openpyxl 3.1.5 y Pillow 12.3.0.
 
 Las pruebas cubren:
 
 - E1 con materiales `Retirado`, cantidades negativas y aportación excluida por movimiento.
 - E1 sin maestro externo y bloqueo de RG11 cuando el catálogo está vacío.
+- E1 con 42 hojas, incluidas 40 auxiliares extensas: procesa únicamente `RG10_SER` y `RG36_MAT`.
+- RG11 con 38 hojas, anexos extensos y hojas E1 adicionales: conserva la prioridad de `RG11_budget`.
+- Conservación de los límites de tamaño global y de dimensiones en las hojas que sí se procesan; revisión completa de las hojas AGP.
 - RG11 con cruce contra el maestro y conservación de ceros iniciales.
 - Material de aportación presente en AGP: se mantiene visible como código solo en AGP.
 - Consolidación de dos AGP y tres protocolos, con nombre de salida correspondiente.

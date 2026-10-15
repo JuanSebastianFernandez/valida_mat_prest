@@ -39,6 +39,8 @@ Debe contener estas hojas:
 
 En E1 se utiliza la clasificación del propio PMS; no se reemplaza por el maestro de aportación de RG11.
 
+El archivo E1 puede traer más de 30 hojas. No tiene que borrar las hojas auxiliares: la validación utiliza `RG10_SER` y `RG36_MAT` y omite las demás hojas del PMS. En RG11 utiliza `RG11_budget`. Se mantienen los límites de tamaño del archivo y de las hojas de datos que sí se procesan.
+
 ## 4. Prepare el resumen de AGP completo
 
 La aplicación admite un AGP con varios protocolos y varios AGP con sus respectivos protocolos.
@@ -176,7 +178,7 @@ Ejemplo de nombre para dos AGP:
 | No se detecta AGP o la jerarquía. | Exportación original con agrupaciones Excel, código `200...` y todos los niveles. |
 | Cantidad inválida. | Texto, errores de fórmula o separadores incorrectos en la fila indicada. |
 | Maestro vacío o inválido. | El administrador debe corregirlo; RG11 no puede validarse sin un maestro válido. |
-| Archivo demasiado extenso. | Filas/columnas sobrantes o exportación con formato aplicado a toda la hoja. |
+| Archivo demasiado extenso. | Revise el tamaño total y las filas/columnas sobrantes en las hojas de datos que se procesan. Las dimensiones de las hojas auxiliares del PMS no bloquean la validación. |
 | Excel con contraseña. | Utilice una copia autorizada sin cifrado para la validación. |
 | Página inactiva después de varias horas. | El alojamiento gratuito puede entrar en reposo. Espere su reactivación. |
 | No abre desde la red corporativa. | Revise con TI el acceso a la dirección de la aplicación, carga y descarga. |

@@ -193,6 +193,59 @@ class PilotoTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "demasiado extensa"):
             verificar_excel(libro_bytes(wb), "PMS")
 
+    def test_e1_con_mas_de_30_hojas_omite_auxiliares_extensas(self):
+        wb = openpyxl.load_workbook(io.BytesIO(pms_e1()))
+        for numero in range(40):
+            ws = wb.create_sheet(f"Anexo_{numero}", 0)
+            ws["A50001"] = "Hoja auxiliar que no se compara"
+        contenido = libro_bytes(wb)
+        verificar_excel(contenido, "PMS", es_pms=True)
+        agp = agp_bytes([("2000138100", [("PR1", [
+            "P001 - T0 - Servicio - 1.000 - 001",
+            "120570 - TRAFO 1F - 1.000- - 001",
+            "970698 - AISLADORES - 2.000- - 001",
+        ])])])
+        resultado = self.validar(contenido, agp)
+        self.assertEqual(resultado["datos_resumen"]["SEMAFORO"], "OK")
+        self.assertEqual(resultado["datos_resumen"]["TOTAL_CODIGOS_PMS"], 3)
+        self.assertEqual(resultado["datos_resumen"]["TOTAL_APORTACION_EXCLUIDOS"], 1)
+
+    def test_rg11_con_anexos_usa_relaciones_y_conserva_prioridad(self):
+        wb = openpyxl.load_workbook(io.BytesIO(pms_e1()))
+        presupuesto = wb.create_sheet("RG11_budget")
+        presupuesto.append(["cod_prest/mat", "quantity"])
+        presupuesto.append(["456", 1])
+        for numero in range(35):
+            wb.create_sheet(f"Auxiliar_{numero}", 0)["ZZ50001"] = "No se procesa"
+        # El motor prioriza RG11 si existe junto con las hojas E1.
+        wb["RG10_SER"]["A50001"] = "No se procesa en este flujo"
+        contenido = libro_bytes(wb)
+        resultado = self.validar(contenido, agp_bytes([
+            ("2000139288", [("PR1", ["456 - Material - 1 - 001"])])]))
+        self.assertEqual(resultado["tipo_pms"], motor.TIPO_RG11)
+        self.assertEqual(resultado["datos_resumen"]["SEMAFORO"], "OK")
+
+    def test_e1_mantiene_limites_en_hojas_requeridas_y_archivo(self):
+        wb = openpyxl.load_workbook(io.BytesIO(pms_e1()))
+        wb["RG36_MAT"]["A50001"] = "Fuera del limite"
+        contenido = libro_bytes(wb)
+        with self.assertRaisesRegex(ValueError, "demasiado extensa"):
+            verificar_excel(contenido, "PMS", es_pms=True)
+        with patch("validacion_web.MAX_XML_BYTES", 1):
+            with self.assertRaisesRegex(ValueError, "descomprimirse"):
+                verificar_excel(pms_e1(), "PMS", es_pms=True)
+
+    def test_agp_no_omite_hojas_extensas_por_su_nombre(self):
+        wb = openpyxl.Workbook()
+        for numero in range(35):
+            wb.create_sheet(f"Auxiliar_{numero}")["A1"] = "Referencia"
+        contenido = libro_bytes(wb)
+        verificar_excel(contenido, "AGP")
+        wb = openpyxl.load_workbook(io.BytesIO(contenido))
+        wb["Auxiliar_34"]["A50001"] = "Fuera del limite"
+        with self.assertRaisesRegex(ValueError, "demasiado extensa"):
+            verificar_excel(libro_bytes(wb), "AGP")
+
     def test_maestro_vacio_bloquea_rg11_permite_e1(self):
         self.ruta_catalogo.write_bytes(serializar_catalogo([]))
         vacio = cargar_catalogo(self.ruta_catalogo)

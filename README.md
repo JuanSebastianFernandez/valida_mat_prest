@@ -48,7 +48,9 @@ El formato Excel conserva el encabezado OCA y el código documental histórico. 
 
 ## Límites del piloto
 
-Un caso en procesamiento simultáneo por proceso de servidor; el resto recibe un aviso para reintentar. Hasta 20 MB por archivo, 30 hojas, 50.000 filas por hoja, 200 columnas y 500.000 celdas por libro; una hoja rectangular tampoco puede superar 500.000 posiciones. Máximo 96 MB de contenido descomprimido. Son límites preventivos del piloto, no la capacidad garantizada del alojamiento.
+Un caso en procesamiento simultáneo por proceso de servidor; el resto recibe un aviso para reintentar. Hasta 20 MB por archivo y 96 MB de contenido descomprimido, con un máximo de 2.048 elementos internos en el Excel. No hay un límite fijo de 30 hojas: los PMS E1 pueden incluir hojas auxiliares adicionales.
+
+Los límites de 50.000 filas por hoja, 200 columnas y 500.000 celdas se comprueban sobre las hojas que se procesan: `RG10_SER` y `RG36_MAT` en E1, o `RG11_budget` en RG11. Una hoja procesada tampoco puede superar 500.000 posiciones rectangulares. Las hojas auxiliares del PMS no se comparan ni se revisan por dimensiones. En AGP se revisan todas las hojas, porque el motor necesita identificar la hoja que contiene el resumen. Son límites preventivos del piloto, no la capacidad garantizada del alojamiento.
 
 No hay cola persistente, histórico de resultados ni recuperación automática de sesión. No se ha certificado capacidad para 20 ejecuciones simultáneas. El servicio gratuito puede entrar en reposo o reiniciarse; mida el uso real antes de adoptarlo como dependencia obligatoria.
 

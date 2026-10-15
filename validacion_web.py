@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import io
+import posixpath
 import tempfile
 import time
 from contextlib import contextmanager
@@ -53,7 +54,37 @@ def nombre_seguro(nombre: str) -> str:
     return nombre
 
 
-def verificar_excel(contenido: bytes, etiqueta: str) -> None:
+def _hojas_relevantes_pms(archivo: ZipFile) -> set[str] | None:
+    """Resuelve las hojas de datos por nombre e ID, sin asumir su orden en el libro."""
+    ns = {"s": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+    ns_rel = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+    libro = ET.fromstring(archivo.read("xl/workbook.xml"))
+    hojas = {
+        hoja.attrib["name"].strip(): hoja.attrib[f"{{{ns_rel}}}id"]
+        for hoja in libro.findall("s:sheets/s:sheet", ns)
+    }
+    if "RG11_budget" in hojas:
+        nombres = ("RG11_budget",)
+    elif {"RG10_SER", "RG36_MAT"}.issubset(hojas):
+        nombres = ("RG10_SER", "RG36_MAT")
+    else:
+        # La deteccion del motor reportara las hojas faltantes; no omitir el prefiltro.
+        return None
+    relaciones = ET.fromstring(archivo.read("xl/_rels/workbook.xml.rels"))
+    destinos = {}
+    for relacion in relaciones:
+        if relacion.attrib.get("TargetMode") == "External":
+            continue
+        if not relacion.attrib.get("Type", "").endswith("/worksheet"):
+            continue
+        destino = relacion.attrib["Target"]
+        destinos[relacion.attrib["Id"]] = posixpath.normpath(
+            destino.lstrip("/") if destino.startswith("/") else posixpath.join("xl", destino)
+        )
+    return {destinos[hojas[nombre]] for nombre in nombres}
+
+
+def verificar_excel(contenido: bytes, etiqueta: str, *, es_pms: bool = False) -> None:
     if not contenido:
         raise ValueError(f"El archivo {etiqueta} esta vacio.")
     if len(contenido) > MAX_ARCHIVO_MB * 1024 * 1024:
@@ -67,8 +98,12 @@ def verificar_excel(contenido: bytes, etiqueta: str) -> None:
                 raise ValueError(f"El archivo {etiqueta} no contiene un libro Excel valido.")
             hojas = [e for e in elementos if e.filename.startswith("xl/worksheets/")
                      and e.filename.endswith(".xml") and "/_rels/" not in e.filename]
-            if len(hojas) > 30:
-                raise ValueError(f"El archivo {etiqueta} supera el limite de 30 hojas del piloto.")
+            relevantes = _hojas_relevantes_pms(archivo) if es_pms else None
+            if relevantes is not None:
+                disponibles = {hoja.filename for hoja in hojas}
+                if not relevantes.issubset(disponibles):
+                    raise KeyError("No se encontro el contenido de las hojas PMS requeridas.")
+                hojas = [hoja for hoja in hojas if hoja.filename in relevantes]
             celdas = 0
             for hoja in hojas:
                 with archivo.open(hoja) as entrada:
@@ -114,7 +149,7 @@ def validar_archivos(
     with reservar_proceso(semaforo):
         inicio = time.monotonic()
         nombre_pms, nombre_agp = nombre_seguro(nombre_pms), nombre_seguro(nombre_agp)
-        verificar_excel(pms, "PMS")
+        verificar_excel(pms, "PMS", es_pms=True)
         verificar_excel(agp, "AGP")
         with tempfile.TemporaryDirectory(prefix="agp_validacion_") as temporal:
             raiz = Path(temporal)
