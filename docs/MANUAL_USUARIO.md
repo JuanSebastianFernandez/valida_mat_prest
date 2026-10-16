@@ -12,7 +12,7 @@ Compara **tipo, código y cantidad**, con cantidades sumadas por código. No ver
 - El resumen de proyecto exportado desde AGP, habitualmente llamado `data.xlsx`.
 - Navegador y acceso a la dirección de la aplicación.
 
-El maestro de materiales de aportación está incorporado en la aplicación. El dibujante no tiene que cargarlo. No se requiere Google Colab, Google Drive, Gmail ni ejecutar código. El piloto acepta hasta 20 MB por archivo; los libros con dimensiones excesivas requieren una exportación limpia.
+El maestro de materiales de aportación está incorporado en la aplicación. El dibujante no tiene que cargarlo. No se requiere Google Colab, Google Drive, Gmail ni ejecutar código. El piloto acepta hasta 60 MB por archivo, incluidos los de 40 y 50 MB; los libros con dimensiones excesivas requieren una exportación limpia. También existe un límite de 256 MB de contenido interno descomprimido por libro. Los archivos grandes pueden tardar más en procesarse.
 
 ## 3. Revise el PMS antes de cargarlo
 

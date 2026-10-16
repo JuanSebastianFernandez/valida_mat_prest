@@ -20,8 +20,8 @@ import pandas as pd
 import validacion_materiales_prestaciones_AGP as motor
 from catalogo_aportacion import Catalogo
 
-MAX_ARCHIVO_MB = 20
-MAX_XML_BYTES = 96 * 1024 * 1024
+MAX_ARCHIVO_MB = 60
+MAX_XML_BYTES = 256 * 1024 * 1024
 MAX_CELDAS = 500_000
 MAX_FILAS = 50_000
 MAX_COLUMNAS = 200

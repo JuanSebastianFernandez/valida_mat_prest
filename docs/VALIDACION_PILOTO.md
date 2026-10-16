@@ -66,6 +66,16 @@ No se observaron errores JavaScript en ese recorrido. Se inspeccionaron visualme
 
 ## Límites de esta verificación
 
+### Ampliación de carga del 16 de octubre de 2026
+
+Se sincronizaron el límite del servidor Streamlit y el del validador a **60 MB por archivo**, y se amplió el límite de contenido interno descomprimido a **256 MB**. Se generaron informes completos con dos libros E1 sintéticos de 40,01 y 50,01 MB y se comprobó el rechazo de un archivo que supera 60 MB.
+
+Estos libros de prueba contienen un adjunto binario para alcanzar el tamaño indicado, con tablas E1 pequeñas. La prueba comprueba la admisión por tamaño y el flujo de generación del informe; no representa una medición de memoria o rendimiento para tablas reales de ese peso. También pasó la prueba existente que conserva los límites de dimensiones en las hojas E1 requeridas y el rechazo de archivos que exceden el límite de descompresión.
+
+El cambio de `server.maxUploadSize` requiere reiniciar Streamlit. No requiere reinstalar dependencias.
+
+### Capacidad y despliegue
+
 Los tiempos corresponden al equipo local y no permiten prometer los mismos tiempos en Community Cloud. No se ha medido un escenario de 20 usuarios cargando archivos simultáneamente ni la disponibilidad del servicio gratuito.
 
 La aplicación limita el procesamiento a una validación a la vez por proceso del servidor y devuelve un mensaje de ocupación a las demás solicitudes. Las sesiones abiertas y los archivos cargados también consumen memoria, aunque todavía no estén en procesamiento.
