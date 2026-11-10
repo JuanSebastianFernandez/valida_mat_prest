@@ -30,6 +30,7 @@ El formato Excel conserva el encabezado OCA y el código documental histórico. 
 
 ## Manuales
 
+- PMS compatibles: RG11 (`RG11_budget`), E1 anterior (`RG10_SER` + `RG36_MAT`) y E1 consolidado (`RG10_MO_MT`). El consolidado utiliza L para códigos, P para cantidades, S para tipo y J para movimientos, localizados por sus encabezados. Si ambos E1 coexisten en el libro, se prioriza el consolidado sin sumar el anterior; RG11 mantiene su prioridad cuando existe `RG11_budget`.
 - [Manual del dibujante](docs/MANUAL_USUARIO.md): disponible también dentro de la aplicación.
 - [Administración y actualización del maestro](docs/ADMINISTRACION.md): comandos de importación, altas, bajas y publicación.
 - [Verificación del piloto](docs/VALIDACION_PILOTO.md): pruebas y límites observados.
@@ -52,7 +53,7 @@ Un caso en procesamiento simultáneo por proceso de servidor; el resto recibe un
 
 El límite de carga se define tanto en `.streamlit/config.toml` (`server.maxUploadSize`) como en `validacion_web.py` (`MAX_ARCHIVO_MB`). Si se modifica la configuración del servidor, reinicie Streamlit para aplicarla. Admitir archivos de 40 o 50 MB no garantiza un tiempo de procesamiento ni capacidad disponible en el alojamiento gratuito.
 
-Los límites de 50.000 filas por hoja, 200 columnas y 500.000 celdas se comprueban sobre las hojas que se procesan: `RG10_SER` y `RG36_MAT` en E1, o `RG11_budget` en RG11. Una hoja procesada tampoco puede superar 500.000 posiciones rectangulares. Las hojas auxiliares del PMS no se comparan ni se revisan por dimensiones. En AGP se revisan todas las hojas, porque el motor necesita identificar la hoja que contiene el resumen. Son límites preventivos del piloto, no la capacidad garantizada del alojamiento.
+Los límites de 50.000 filas por hoja, 200 columnas y 500.000 celdas se comprueban sobre las hojas que se procesan: `RG10_MO_MT` en E1 consolidado, `RG10_SER` y `RG36_MAT` en E1 anterior, o `RG11_budget` en RG11. Una hoja procesada tampoco puede superar 500.000 posiciones rectangulares. Las hojas auxiliares del PMS no se comparan ni se revisan por dimensiones. En AGP se revisan todas las hojas, porque el motor necesita identificar la hoja que contiene el resumen. Son límites preventivos del piloto, no la capacidad garantizada del alojamiento.
 
 No hay cola persistente, histórico de resultados ni recuperación automática de sesión. No se ha certificado capacidad para 20 ejecuciones simultáneas. El servicio gratuito puede entrar en reposo o reiniciarse; mida el uso real antes de adoptarlo como dependencia obligatoria.
 

@@ -63,11 +63,9 @@ def _hojas_relevantes_pms(archivo: ZipFile) -> set[str] | None:
         hoja.attrib["name"].strip(): hoja.attrib[f"{{{ns_rel}}}id"]
         for hoja in libro.findall("s:sheets/s:sheet", ns)
     }
-    if "RG11_budget" in hojas:
-        nombres = ("RG11_budget",)
-    elif {"RG10_SER", "RG36_MAT"}.issubset(hojas):
-        nombres = ("RG10_SER", "RG36_MAT")
-    else:
+    try:
+        _, nombres = motor.identificar_formato_pms(hojas)
+    except motor.ErrorValidacion:
         # La deteccion del motor reportara las hojas faltantes; no omitir el prefiltro.
         return None
     relaciones = ET.fromstring(archivo.read("xl/_rels/workbook.xml.rels"))
@@ -173,7 +171,7 @@ def validar_archivos(
                 ruta_maestro = raiz / "maestro_aportacion.xlsx"
                 pd.DataFrame({"MAT APORT": list(codigos)}).to_excel(ruta_maestro, index=False)
                 version_maestro = catalogo.version if tipo_pms == motor.TIPO_RG11 and catalogo else (
-                    "No aplica: E1" if tipo_pms == motor.TIPO_E1 else "No aplica: PMS no detectado"
+                    "No aplica: E1" if tipo_pms in motor.TIPOS_E1 else "No aplica: PMS no detectado"
                 )
                 resultado = motor.ejecutar_validacion(
                     str(ruta_pms), str(ruta_agp), str(ruta_maestro), str(raiz / "salida"),

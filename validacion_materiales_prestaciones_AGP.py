@@ -34,6 +34,8 @@ from openpyxl.drawing.image import Image as ExcelImage
 
 TIPO_RG11 = "RG11_budget (flujo nuevo / viejo fuera de E1)"
 TIPO_E1 = "Flujo viejo E1 (RG10_SER + RG36_MAT)"
+TIPO_E1_CONSOLIDADO = "E1 consolidado (RG10_MO_MT)"
+TIPOS_E1 = (TIPO_E1, TIPO_E1_CONSOLIDADO)
 TIPO_PRESTACION = "MDO/PRESTACION"
 TIPO_MATERIAL = "MAT"
 TOLERANCIA_CANTIDAD = 1e-6
@@ -351,16 +353,24 @@ def listar_hojas_excel(ruta_archivo: str) -> list[str]:
         ) from exc
 
 
-def detectar_tipo_pms(ruta_archivo: str) -> str:
-    hojas = {hoja.strip() for hoja in listar_hojas_excel(ruta_archivo)}
+def identificar_formato_pms(hojas: Iterable[str]) -> tuple[str, tuple[str, ...]]:
+    """Una misma prioridad para la deteccion y el prefiltro web; nunca suma formatos."""
+    hojas = {hoja.strip() for hoja in hojas}
     if "RG11_budget" in hojas:
-        return TIPO_RG11
+        return TIPO_RG11, ("RG11_budget",)
+    if "RG10_MO_MT" in hojas:
+        return TIPO_E1_CONSOLIDADO, ("RG10_MO_MT",)
     if {"RG10_SER", "RG36_MAT"}.issubset(hojas):
-        return TIPO_E1
+        return TIPO_E1, ("RG10_SER", "RG36_MAT")
     raise ErrorValidacion(
         "No se pudo detectar el tipo de archivo PMS. Verifique que el archivo "
-        "tenga la hoja RG11_budget o las hojas RG10_SER y RG36_MAT."
+        "tenga la hoja RG11_budget, la hoja E1 RG10_MO_MT o las hojas "
+        "E1 anteriores RG10_SER y RG36_MAT."
     )
+
+
+def detectar_tipo_pms(ruta_archivo: str) -> str:
+    return identificar_formato_pms(listar_hojas_excel(ruta_archivo))[0]
 
 
 def _registrar_error(
@@ -534,8 +544,12 @@ def leer_pms_rg11_budget(
 
 
 def leer_pms_e1(
-    ruta_archivo: str, errores: list[dict[str, Any]] | None = None
+    ruta_archivo: str, errores: list[dict[str, Any]] | None = None,
+    *, tipo_pms: str | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
+    tipo_pms = tipo_pms or detectar_tipo_pms(ruta_archivo)
+    if tipo_pms == TIPO_E1_CONSOLIDADO:
+        return leer_pms_e1_consolidado(ruta_archivo, errores)
     errores = errores if errores is not None else []
     registros: list[dict[str, Any]] = []
     excluidos: list[dict[str, Any]] = []
@@ -717,6 +731,86 @@ def leer_pms_e1(
         raise
     except Exception as exc:
         raise ErrorValidacion(f"No fue posible leer el PMS E1: {exc}") from exc
+
+
+def leer_pms_e1_consolidado(
+    ruta_archivo: str, errores: list[dict[str, Any]] | None = None
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Lee RG10_MO_MT: L codigo, P cantidad, S tipo y J movimiento en el formato actual."""
+    errores = errores if errores is not None else []
+    registros: list[dict[str, Any]] = []
+    excluidos: list[dict[str, Any]] = []
+    wb = None
+    try:
+        wb = _cargar_workbook_seguro(
+            ruta_archivo, read_only=True, data_only=True, keep_links=False
+        )
+        if "RG10_MO_MT" not in wb.sheetnames:
+            raise ErrorValidacion("No se encontro la hoja RG10_MO_MT.")
+        ws = wb["RG10_MO_MT"]
+        columnas = {
+            "codigo": ("PRESTACION MATERIAL", "CODIGO PRESTACION MATERIAL"),
+            "cantidad": ("CANTIDAD", "CANTIDAD TOTAL"),
+            "tipo": ("MO MT",),
+            "movimiento": ("MOVIMIENTO", "TIPO DE MOVIMIENTO"),
+        }
+        fila_header, encabezados = _buscar_fila_encabezados(ws, columnas.values())
+        indices = {campo: _indice_columna(encabezados, aliases) for campo, aliases in columnas.items()}
+        idx_descripcion = _indice_columna(encabezados, ("DESCRIPCION DE LA ACTIVIDAD", "DESCRIPCION"))
+        tipos = {"MATERIAL": TIPO_MATERIAL, "PRESTACION": TIPO_PRESTACION}
+        for numero_fila, fila in enumerate(
+            ws.iter_rows(min_row=fila_header + 1, values_only=True), start=fila_header + 1
+        ):
+            valor_codigo = fila[indices["codigo"]]
+            valor_cantidad = fila[indices["cantidad"]]
+            if valor_codigo in (None, "") and valor_cantidad in (None, ""):
+                continue
+            codigo = normalizar_codigo(valor_codigo)
+            if not codigo:
+                _registrar_error(errores, "PMS", ws.title, numero_fila, "PRESTACION/MATERIAL",
+                                valor_codigo, "Se encontro una fila con cantidad pero sin codigo.")
+                continue
+            valor_tipo = fila[indices["tipo"]]
+            tipo = tipos.get(normalizar_encabezado(valor_tipo))
+            if tipo is None:
+                _registrar_error(
+                    errores, "PMS", ws.title, numero_fila, "MO_MT", valor_tipo,
+                    "MO_MT debe indicar PRESTACION o MATERIAL. Si contiene una formula, "
+                    "recalcule y guarde el Excel antes de cargarlo.",
+                )
+                continue
+            cantidad = normalizar_cantidad(valor_cantidad)
+            error_dato = cantidad is None
+            if error_dato:
+                _registrar_error(errores, "PMS", ws.title, numero_fila, "CANTIDAD",
+                                valor_cantidad, "No fue posible convertir la cantidad a numero.")
+            descripcion = fila[idx_descripcion] if idx_descripcion is not None else ""
+            movimiento = normalizar_encabezado(fila[indices["movimiento"]])
+            registro = _registro_crudo(
+                "PMS", tipo, codigo, descripcion, cantidad, error_dato, ws.title, numero_fila
+            )
+            if tipo == TIPO_MATERIAL:
+                if "MATERIAL DE APORTACION" in movimiento:
+                    excluidos.append({
+                        **{campo: registro[campo] for campo in COLUMNAS_EXCLUIDOS if campo != "MOTIVO_EXCLUSION"},
+                        "MOTIVO_EXCLUSION": "MOVIMIENTO = Material de aportacion (RG10_MO_MT)",
+                    })
+                    continue
+                # Solo el movimiento del material determina el retiro; nunca su descripcion.
+                if cantidad is not None and movimiento in {"RETIRADO", "RETIRADA", "RETIRO", "CHATARRA"}:
+                    registro["CANTIDAD"] = -abs(cantidad)
+            registros.append(registro)
+        if not registros and not excluidos:
+            raise ErrorValidacion("La hoja RG10_MO_MT no contiene materiales o prestaciones legibles.")
+        return (pd.DataFrame(registros, columns=COLUMNAS_CRUDO),
+                pd.DataFrame(excluidos, columns=COLUMNAS_EXCLUIDOS))
+    except ErrorValidacion:
+        raise
+    except Exception as exc:
+        raise ErrorValidacion(f"No fue posible leer el PMS E1 consolidado RG10_MO_MT: {exc}") from exc
+    finally:
+        if wb is not None:
+            wb.close()
 
 
 def leer_materiales_aportacion(
@@ -1747,7 +1841,7 @@ def ejecutar_validacion(
                 pms_crudo, maestro, tipo_pms
             )
         else:
-            pms_crudo, excluidos = leer_pms_e1(ruta_pms, errores)
+            pms_crudo, excluidos = leer_pms_e1(ruta_pms, errores, tipo_pms=tipo_pms)
     except Exception as exc:
         _registrar_error(
             errores,

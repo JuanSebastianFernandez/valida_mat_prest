@@ -1,15 +1,18 @@
 # Verificación del piloto Streamlit
 
-Fecha: 15 de octubre de 2026.
+Última validación: 10 de noviembre de 2026.
 
 ## Alcance comprobado
 
-Se ejecutaron **19 pruebas automatizadas satisfactorias** con Python 3.12.10, Streamlit 1.66.0, pandas 3.0.6, openpyxl 3.1.5 y Pillow 12.3.0.
+Se ejecutaron **25 pruebas automatizadas satisfactorias** con Python 3.12.10, Streamlit 1.66.0, pandas 3.0.6, openpyxl 3.1.5 y Pillow 12.3.0.
 
 Las pruebas cubren:
 
 - E1 con materiales `Retirado`, cantidades negativas y aportación excluida por movimiento.
 - E1 sin maestro externo y bloqueo de RG11 cuando el catálogo está vacío.
+- E1 consolidado `RG10_MO_MT`: códigos, cantidades, tipo explícito, aportación por movimiento y retiros de materiales negativos, manteniendo positivas las prestaciones de retiro.
+- Consolidado con tipo o cantidad inválidos, encabezado de movimiento faltante y anexos extensos: no se presenta como validación correcta.
+- Coexistencia de ambos formatos E1 sin sumar dos veces sus cantidades y conservación de los límites en la hoja que sí se procesa.
 - E1 con 42 hojas, incluidas 40 auxiliares extensas: procesa únicamente `RG10_SER` y `RG36_MAT`.
 - RG11 con 38 hojas, anexos extensos y hojas E1 adicionales: conserva la prioridad de `RG11_budget`.
 - Conservación de los límites de tamaño global y de dimensiones en las hojas que sí se procesan; revisión completa de las hojas AGP.
@@ -63,6 +66,25 @@ Se comprobó con Chrome en servidor local:
 8. Vista en pantalla de escritorio y móvil de 390 píxeles de ancho.
 
 No se observaron errores JavaScript en ese recorrido. Se inspeccionaron visualmente la pantalla inicial, el resultado, el manual, el maestro y la vista móvil.
+
+## E1 consolidado: archivos adjuntos del 10 de noviembre de 2026
+
+Se validó el PMS `20261109140925_5f8674083c4c44da92f9fa62cdfdcb03.xlsm` contra `export20261110214622.xlsx`, sin maestro externo. El archivo tiene 27 hojas; la utilizada para PMS fue `RG10_MO_MT`, con encabezados en la fila 3.
+
+Se confirmó L como código, P como cantidad, S (`MO_MT`) como tipo, M como descripción y J (`MOVIMIENTO`) como regla de aportación/retiro. Los materiales con movimiento explícito `Chatarra` en este formato se compararon con cantidad negativa; la prestación de retiro mantuvo su cantidad positiva. La misma prestación `QQ1731`, separada en dos filas AGP, se consolidó correctamente a 2.
+
+| Indicador | Resultado |
+| --- | --- |
+| AGP / protocolo | `2000145872` / `1000168161` |
+| Códigos PMS valorizables | 14 |
+| Códigos AGP | 14 |
+| Coincidencias | 14 |
+| Diferencias de cantidad / solo PMS / solo AGP | 0 / 0 / 0 |
+| Aportación excluida | 2 códigos: `780351` y `780182` |
+| Errores | 0 |
+| Resultado general | OK |
+
+Se generó y reabrió el Excel con las 10 hojas del formato existente. Los archivos reales de entrada y su informe no se incluyen en el paquete público. La compatibilidad con E1 anterior y RG11 se comprobó en la misma ejecución de las 25 pruebas.
 
 ## Límites de esta verificación
 

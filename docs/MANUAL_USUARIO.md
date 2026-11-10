@@ -22,24 +22,39 @@ Debe contener la hoja `RG11_budget`, con columnas `cod_prest/mat` y `quantity`. 
 
 Esta estructura se utiliza tanto para flujo nuevo como para flujo viejo fuera de E1. La herramienta no distingue esos dos procesos por el nombre de la hoja: aplica el mismo lector y cruza los materiales contra el maestro vigente de aportación.
 
-### PMS E1: revisión obligatoria del movimiento en el archivo fuente
+### PMS E1: se admiten el formato anterior y el consolidado
 
-Debe contener estas hojas:
+El **formato anterior** debe contener estas dos hojas:
 
 | Hoja | Columnas necesarias |
 | --- | --- |
 | `RG10_SER` | `PRESTACIÓN`, `CANTIDAD` |
 | `RG36_MAT` | `CÓDIGO MATERIAL E4E`, `CANTIDAD`, `TIPO DE MOVIMIENTO` |
 
-**Antes de cargar E1, revise `TIPO DE MOVIMIENTO` para afinar los materiales de aportación y retirados.**
+El **formato consolidado nuevo** utiliza una sola hoja, `RG10_MO_MT`, con prestaciones y materiales juntos:
+
+| Columna habitual | Encabezado | Uso |
+| --- | --- | --- |
+| J | `MOVIMIENTO` | Identifica aportación y retiros de materiales. |
+| L | `PRESTACIÓN/ MATERIAL` | Código del material o prestación. |
+| M | `DESCRIPCIÓN DE LA ACTIVIDAD` | Descripción de referencia, si está disponible. |
+| P | `CANTIDAD` | Cantidad total a comparar. No se utiliza `PUNTOS` de O ni el valor monetario `TOTAL` de R. |
+| S | `MO_MT` | Debe indicar `PRESTACION` o `MATERIAL`; define el tipo del registro. |
+
+El lector busca los encabezados, normalmente en la fila 3, y usa las columnas correspondientes. Las filas superiores de resumen no se suman como registros de valorización.
+
+**Antes de cargar E1, revise `TIPO DE MOVIMIENTO` en el formato anterior o `MOVIMIENTO` en el consolidado para afinar aportación y retiros.**
 
 - **Material de aportación:** se excluye del PMS valorizable y se reporta en auditoría.
-- **Retirado:** se compara con cantidad negativa. Tanto `1` como `-1` quedan en `-1`; la regla no invierte por segunda vez un signo que ya era negativo.
-- **Chatarra:** revise especialmente estos materiales. La herramienta no deduce que un material es retirado solo por su descripción. Si el movimiento fue diligenciado incorrectamente, corrija el PMS según la revisión técnica antes de validar.
+- **Retirado:** el material se compara con cantidad negativa. Tanto `1` como `-1` quedan en `-1`; la regla no invierte por segunda vez un signo que ya era negativo.
+- **Consolidado `RG10_MO_MT`:** los materiales con `MOVIMIENTO` igual a `Retiro`, `Retirado`, `Retirada` o `Chatarra` se llevan a negativo. Esta regla utiliza el movimiento explícito de J, no palabras dentro de la descripción. Las prestaciones de retiro permanecen con la cantidad de P: no se vuelven negativas por llamarse retiro.
+- **Chatarra en el formato anterior:** se conserva la regla anterior de `Retirado`. Revise especialmente la clasificación del archivo fuente; la herramienta no deduce un retiro solo por la descripción del material.
 
-En E1 se utiliza la clasificación del propio PMS; no se reemplaza por el maestro de aportación de RG11.
+En ambos formatos E1 se utiliza la clasificación del propio PMS; no se reemplaza por el maestro de aportación de RG11. Si `MO_MT` tiene una fórmula sin valor guardado o un tipo no reconocido, se registra un error; recalcule y guarde el Excel antes de cargarlo.
 
-El archivo E1 puede traer más de 30 hojas. No tiene que borrar las hojas auxiliares: la validación utiliza `RG10_SER` y `RG36_MAT` y omite las demás hojas del PMS. En RG11 utiliza `RG11_budget`. Se mantienen los límites de tamaño del archivo y de las hojas de datos que sí se procesan.
+El archivo E1 puede traer más de 30 hojas. No tiene que borrar las hojas auxiliares: se utiliza `RG10_MO_MT` en el consolidado o `RG10_SER` y `RG36_MAT` en el anterior. Si aparecen ambos formatos E1 dentro del mismo libro, tiene prioridad `RG10_MO_MT`; **no se suman los dos formatos**, para evitar duplicar cantidades. Si existe `RG11_budget`, se conserva la prioridad de ese flujo. El formato elegido se informa en `Resumen`.
+
+Se mantienen los límites de tamaño del archivo y de las hojas de datos que sí se procesan.
 
 ## 4. Prepare el resumen de AGP completo
 
@@ -106,7 +121,7 @@ En proyectos con varios AGP o protocolos, la comparación es **consolidada para 
 
 **Los materiales de aportación no deben valorizarse.**
 
-En RG11, el sistema excluye del PMS los materiales cuyos códigos cruzan con el maestro. En E1, excluye los clasificados como `Material de aportación` en el propio PMS. Todos quedan en `Materiales_Aportacion_Excluidos` con el motivo y la ubicación del registro fuente.
+En RG11, el sistema excluye del PMS los materiales cuyos códigos cruzan con el maestro. En E1, excluye los clasificados como `Material de aportación` en el propio PMS: `TIPO DE MOVIMIENTO` en el anterior o `MOVIMIENTO` en el consolidado `RG10_MO_MT`. Todos quedan en `Materiales_Aportacion_Excluidos` con el motivo y la ubicación del registro fuente.
 
 La exclusión se aplica al PMS valorizable. No se eliminan silenciosamente esos códigos de AGP: si un material de aportación fue valorizado allí, puede aparecer como `SOLO_EN_AGP` y requiere revisión.
 
@@ -173,7 +188,7 @@ Ejemplo de nombre para dos AGP:
 
 | Mensaje o situación | Qué revisar |
 | --- | --- |
-| No se detecta PMS. | Hojas `RG11_budget` o ambas `RG10_SER` y `RG36_MAT`; no basta con renombrar el archivo. |
+| No se detecta PMS. | Hoja `RG11_budget`, hoja E1 `RG10_MO_MT` o ambas `RG10_SER` y `RG36_MAT`; no basta con renombrar el archivo. |
 | Falta una columna. | Encabezados reales y estructura del PMS; no cambie solo el título de una tabla diferente. |
 | No se detecta AGP o la jerarquía. | Exportación original con agrupaciones Excel, código `200...` y todos los niveles. |
 | Cantidad inválida. | Texto, errores de fórmula o separadores incorrectos en la fila indicada. |

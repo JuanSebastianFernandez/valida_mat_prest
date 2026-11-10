@@ -55,6 +55,27 @@ def pms_e1():
     return libro_bytes(wb)
 
 
+def pms_e1_consolidado(filas=None):
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "RG10_MO_MT"
+    ws["C2"] = "SERVICIOS"
+    ws["E2"] = 12345
+    for columna, texto in {10: "MOVIMIENTO ", 12: "PRESTACI\u00d3N/ MATERIAL",
+                            13: "DESCRIPCI\u00d3N DE LA ACTIVIDAD", 16: "CANTIDAD", 19: "MO_MT"}.items():
+        ws.cell(3, columna, texto)
+    if filas is None:
+        filas = [("P001", 1, "PRESTACION", "Retiro", "Servicio"),
+                 ("120570", 1, "MATERIAL", "Retiro", "Transformador"),
+                 ("970698", -2, "MATERIAL", "Chatarra", "Aisladores"),
+                 ("001234", 4, "MATERIAL", "Material de aportaci\u00f3n", "Aportacion")]
+    for n, (codigo, cantidad, tipo, movimiento, descripcion) in enumerate(filas, 4):
+        for columna, valor in {10: movimiento, 12: codigo, 13: descripcion, 16: cantidad, 19: tipo}.items():
+            ws.cell(n, columna, valor)
+    ws.cell(len(filas) + 5, 9, "Direccion sin registros de valorizacion")
+    return libro_bytes(wb)
+
+
 def agp_bytes(proyectos, historico=False):
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -100,6 +121,89 @@ class PilotoTest(unittest.TestCase):
         self.assertEqual(tabla.loc["120570", "CANTIDAD_PMS"], -1)
         self.assertEqual(tabla.loc["970698", "CANTIDAD_PMS"], -2)
         self.assertEqual(resultado["datos_resumen"]["VERSION_MAESTRO_SHA256"], "No aplica: E1")
+
+    def test_e1_consolidado_conserva_reglas_y_no_depende_del_maestro(self):
+        agp = agp_bytes([("2000138100", [("PR1", [
+            "P001 - T0 - Servicio de retiro - 1 - 001",
+            "120570 - TRAFO - 1.000- - 001",
+            "970698 - AISLADORES - 2.000- - 001",
+        ])])])
+        resultado = validar_archivos("nuevo.xlsm", pms_e1_consolidado(), "data.xlsx", agp, None, BoundedSemaphore(1))
+        self.assertEqual(resultado["tipo_pms"], motor.TIPO_E1_CONSOLIDADO)
+        self.assertEqual(resultado["datos_resumen"]["SEMAFORO"], "OK")
+        self.assertEqual(resultado["datos_resumen"]["TOTAL_CODIGOS_PMS"], 3)
+        self.assertEqual(resultado["datos_resumen"]["TOTAL_APORTACION_EXCLUIDOS"], 1)
+        self.assertEqual(resultado["datos_resumen"]["VERSION_MAESTRO_SHA256"], "No aplica: E1")
+        self.assertEqual(resultado["comparacion"].set_index("CODIGO").loc["P001", "CANTIDAD_PMS"], 1)
+        self.assertEqual(resultado["excluidos"].iloc[0]["CODIGO"], "001234")
+        self.assertEqual(resultado["excluidos"].iloc[0]["HOJA"], "RG10_MO_MT")
+
+    def test_e1_consolidado_usa_tipo_explicito_y_no_deduce_retiro_de_descripcion(self):
+        ruta = self.raiz / "nuevo.xlsx"
+        ruta.write_bytes(pms_e1_consolidado([
+            ("1234", "1,5", "PRESTACI\u00d3N", "Retiro", "Prestacion numerica"),
+            ("ABC", 2, "MATERIAL", "Enel", "Chatarra y retirado en la descripcion"),
+            ("5678", -3, "MATERIAL", "Retirado", "Material retirado"),
+        ]))
+        errores = []
+        crudo, excluidos = motor.leer_pms_e1(str(ruta), errores)
+        tabla = crudo.set_index("CODIGO")
+        self.assertEqual(tabla.loc["1234", "TIPO"], motor.TIPO_PRESTACION)
+        self.assertEqual(tabla.loc["1234", "CANTIDAD"], 1.5)
+        self.assertEqual(tabla.loc["ABC", "TIPO"], motor.TIPO_MATERIAL)
+        self.assertEqual(tabla.loc["ABC", "CANTIDAD"], 2)
+        self.assertEqual(tabla.loc["5678", "CANTIDAD"], -3)
+        self.assertFalse(errores)
+        self.assertTrue(excluidos.empty)
+
+    def test_e1_consolidado_reporta_tipo_y_cantidad_invalidos(self):
+        pms = pms_e1_consolidado([
+            ("P001", "no numerica", "PRESTACION", "Retiro", "Servicio"),
+            ("120570", 1, None, "Enel", "Tipo sin valor guardado"),
+        ])
+        agp = agp_bytes([("2000138100", [("PR1", [
+            "P001 - T0 - Servicio - 1 - 001", "120570 - TRAFO - 1 - 001",
+        ])])])
+        resultado = self.validar(pms, agp)
+        self.assertEqual(resultado["datos_resumen"]["SEMAFORO"], "ERROR")
+        self.assertIn("MO_MT", resultado["errores"]["CAMPO"].tolist())
+        self.assertIn("CANTIDAD", resultado["errores"]["CAMPO"].tolist())
+        self.assertEqual(resultado["comparacion"].set_index("CODIGO").loc["P001", "ESTADO_VALIDACION"], "ERROR_DATO")
+
+    def test_e1_consolidado_exige_movimiento_para_no_omitir_aportacion(self):
+        wb = openpyxl.load_workbook(io.BytesIO(pms_e1_consolidado()))
+        wb["RG10_MO_MT"]["J3"] = None
+        pms = libro_bytes(wb)
+        resultado = self.validar(pms, agp_bytes([("2000138100", [("PR1", ["P001 - T0 - Servicio - 1 - 001"])])]))
+        self.assertEqual(resultado["datos_resumen"]["SEMAFORO"], "ERROR")
+        self.assertTrue(any("MOVIMIENTO" in m for m in resultado["errores"]["MENSAJE"]))
+
+    def test_e1_consolidado_tiene_prioridad_sin_sumar_formato_anterior(self):
+        wb = openpyxl.load_workbook(io.BytesIO(pms_e1()))
+        nuevo = wb.create_sheet("RG10_MO_MT")
+        origen = openpyxl.load_workbook(io.BytesIO(pms_e1_consolidado([
+            ("P001", 1, "PRESTACION", "Otro", "Servicio"),
+        ])))
+        for fila in origen.active.iter_rows():
+            for celda in fila:
+                nuevo[celda.coordinate] = celda.value
+        origen.close()
+        wb["RG36_MAT"]["A50001"] = "Hoja anterior que no se usa"
+        resultado = self.validar(libro_bytes(wb), agp_bytes([
+            ("2000138100", [("PR1", ["P001 - T0 - Servicio - 1 - 001"])])]))
+        self.assertEqual(resultado["tipo_pms"], motor.TIPO_E1_CONSOLIDADO)
+        self.assertEqual(resultado["datos_resumen"]["SEMAFORO"], "OK")
+        self.assertEqual(resultado["datos_resumen"]["TOTAL_CODIGOS_PMS"], 1)
+
+    def test_e1_consolidado_prefiltro_ignora_anexos_y_conserva_limites(self):
+        wb = openpyxl.load_workbook(io.BytesIO(pms_e1_consolidado()))
+        for numero in range(40):
+            wb.create_sheet(f"Auxiliar_{numero}", 0)["ZZ50001"] = "No se procesa"
+        verificar_excel(libro_bytes(wb), "PMS", es_pms=True)
+        wb = openpyxl.load_workbook(io.BytesIO(pms_e1_consolidado()))
+        wb["RG10_MO_MT"]["L50001"] = "Dato excesivo"
+        with self.assertRaisesRegex(ValueError, "demasiado extensa"):
+            verificar_excel(libro_bytes(wb), "PMS", es_pms=True)
 
     def test_varios_agp_protocolos_y_nombre_salida(self):
         pms = pms_rg11([("456", 3, "Material"), ("P001", 3, "Servicio"), ("001234", 2, "Aportacion")])

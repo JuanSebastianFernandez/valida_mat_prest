@@ -2,7 +2,7 @@
 
 ## Modelo de administración
 
-El maestro es `catalogo/materiales_aportacion.csv`. Se distribuye con la aplicación y se aplica automáticamente a RG11. E1 utiliza su columna `TIPO DE MOVIMIENTO`.
+El maestro es `catalogo/materiales_aportacion.csv`. Se distribuye con la aplicación y se aplica automáticamente a RG11. E1 utiliza `TIPO DE MOVIMIENTO` en el formato anterior (`RG10_SER` y `RG36_MAT`) o `MOVIMIENTO` en el consolidado nuevo (`RG10_MO_MT`). Ambos formatos son compatibles; el consolidado no necesita el maestro.
 
 En este piloto no hay una pestaña para editar el maestro desde la web. El administrador actualiza su copia local y publica el CSV en GitHub. Esto evita introducir contraseñas o credenciales de escritura en una aplicación pública.
 

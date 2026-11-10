@@ -193,7 +193,8 @@ def mostrar_validacion() -> None:
     st.subheader("Prepare y cargue el caso")
     st.markdown(
         '<div class="agp-note"><strong>Antes de cargar:</strong> en E1 revise '
-        '<strong>TIPO DE MOVIMIENTO</strong>: aportación se excluye y Retirado se lleva '
+        '<strong>TIPO DE MOVIMIENTO</strong> (formato anterior) o <strong>MOVIMIENTO</strong> '
+        '(RG10_MO_MT): aportación se excluye y los materiales retirados se llevan '
         'a negativo. Si hay varios AGP o protocolos, incluya todos en un solo resumen '
         'de proyecto y conserve sus niveles de agrupación.</div>', unsafe_allow_html=True,
     )
@@ -211,7 +212,7 @@ def mostrar_validacion() -> None:
     with izquierda:
         with st.container(border=True):
             st.markdown("#### 01 · Archivo original PMS")
-            st.caption("RG11_budget o las hojas E1 RG10_SER y RG36_MAT.")
+            st.caption("RG11_budget, E1 consolidado RG10_MO_MT o E1 anterior RG10_SER + RG36_MAT.")
             pms = st.file_uploader(
                 "Cargar PMS", type=["xlsx", "xlsm"], key=f"pms_{carga_id}",
                 on_change=limpiar_resultado,
